@@ -1,13 +1,4 @@
----
-AIGC:
-    Label: "1"
-    ContentProducer: 001191440300708461136T1XGW3
-    ProduceID: e9402fbbdd875a4359af4b0210d1baa1_ad842d29b0f311f18039525400461939
-    ReservedCode1: IDRP2+85fOszOGKCRqE4hTfZ5RM++UcIKa0W/EP6vzA2Cicl/cZdhyokqjS7VzYIp3/rFMjP9o6/Ql9r7t8K1PCM27QjsNG+TjA8q0WQR4uvJs2sd2H2+QqLxKfpmo42aJFGcIUPX7v2iA/57bqCEfQxcs/uUr2iMabDS5QFku+dKpFzgaAg0xilQTI=
-    ContentPropagator: 001191440300708461136T1XGW3
-    PropagateID: e9402fbbdd875a4359af4b0210d1baa1_ad842d29b0f311f18039525400461939
-    ReservedCode2: IDRP2+85fOszOGKCRqE4hTfZ5RM++UcIKa0W/EP6vzA2Cicl/cZdhyokqjS7VzYIp3/rFMjP9o6/Ql9r7t8K1PCM27QjsNG+TjA8q0WQR4uvJs2sd2H2+QqLxKfpmo42aJFGcIUPX7v2iA/57bqCEfQxcs/uUr2iMabDS5QFku+dKpFzgaAg0xilQTI=
----
+
 
 # 加密聊天室（Secure Chatroom）
 
