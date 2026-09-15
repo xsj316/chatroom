@@ -1,0 +1,26 @@
+{
+  "name": "secure-chatroom",
+  "version": "1.0.0",
+  "description": "轻量加密网页聊天室：Node.js + Express + Socket.IO + Web Crypto API，AES-256-GCM 加密消息、SHA-256 加盐哈希密码",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "chatroom",
+    "socket.io",
+    "aes-256-gcm",
+    "websocket",
+    "encryption"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
