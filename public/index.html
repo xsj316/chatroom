@@ -25,11 +25,27 @@
       min-height: 100vh;
     }
 
-    /* ---------------- 加入页 ---------------- */
-    #joinPage {
+    /* ---------------- 登录 / 注册页（微软账号风格，默认显示） ---------------- */
+    #loginPage {
       display: flex; align-items: center; justify-content: center;
       min-height: 100vh; padding: 24px;
     }
+    #loginPage .auth-card { display: none; }
+    #loginPage .auth-card.active { display: block; }
+    .auth-card h1 { font-size: 22px; margin-bottom: 4px; }
+    .auth-card .sub { color: var(--muted); font-size: 13px; margin-bottom: 26px; }
+    .switch-link { margin-top: 18px; font-size: 13px; color: var(--muted); }
+    .switch-link a {
+      color: var(--accent); text-decoration: none; font-weight: 600; cursor: pointer;
+    }
+    .switch-link a:hover { text-decoration: underline; }
+
+    /* ---------------- 加入页（默认隐藏，登录成功后显示） ---------------- */
+    #joinPage {
+      display: none; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    #joinPage.show { display: flex; }
     .join-card {
       width: 100%; max-width: 420px;
       background: var(--panel);
@@ -40,6 +56,38 @@
     }
     .join-card h1 { font-size: 22px; margin-bottom: 4px; }
     .join-card .sub { color: var(--muted); font-size: 13px; margin-bottom: 26px; }
+    .join-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .join-top h1 { margin-bottom: 0; }
+    .join-top .btn-sm { width: auto; padding: 7px 14px; font-size: 13px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; cursor: pointer; }
+    .join-top .btn-sm:hover { border-color: var(--accent); }
+
+    /* ---------------- 账号设置页（微软账号风格，默认隐藏） ---------------- */
+    #settingsPage {
+      display: none; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    #settingsPage.active { display: flex; }
+    .settings-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+    .settings-top h1 { font-size: 22px; }
+    .settings-top .btn-sm { width: auto; padding: 7px 14px; font-size: 13px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; cursor: pointer; }
+    .settings-top .btn-sm:hover { border-color: var(--accent); }
+    .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .info-row .k { color: var(--muted); }
+    .info-row .v { color: var(--text); font-weight: 600; }
+    .section-title { margin: 22px 0 10px; font-size: 13px; color: var(--muted); font-weight: 600; }
+    .dk-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; margin-bottom: 8px; font-size: 13px; }
+    .dk-item .dk-meta { flex: 1; min-width: 0; }
+    .dk-item .dk-tail { color: var(--accent-2); font-family: Consolas, monospace; }
+    .dk-item .dk-time { color: var(--muted); font-size: 12px; }
+    .dk-del { width: auto; padding: 5px 12px; font-size: 12px; background: transparent; border: 1px solid rgba(255,107,107,.5); color: var(--danger); border-radius: 7px; cursor: pointer; }
+    .dk-del:hover { background: rgba(255,107,107,.12); }
+    .btn-outline { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-2); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color .15s; }
+    .btn-outline:hover { border-color: var(--accent); }
+    .new-dk-box { display: none; margin-top: 14px; padding: 14px; background: rgba(110,231,183,.08); border: 1px solid rgba(110,231,183,.4); border-radius: 10px; }
+    .new-dk-box.show { display: block; }
+    .new-dk-box .key-text { word-break: break-all; font-family: Consolas, monospace; font-size: 14px; color: var(--accent-2); background: var(--panel); border-radius: 7px; padding: 10px; margin: 8px 0; user-select: all; }
+    .new-dk-box .warn { font-size: 12px; color: var(--danger); }
+    .empty-tip { color: var(--muted); font-size: 13px; padding: 8px 0; }
     .field { margin-bottom: 16px; }
     .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
     .field input {
@@ -138,6 +186,26 @@
       margin-left: auto; cursor: pointer; color: var(--muted); font-size: 16px; padding: 0 6px;
     }
     .private-bar .close:hover { color: var(--danger); }
+
+    /* ---------------- 好友请求内联确认条 ---------------- */
+    #friendRequestBar {
+      display: none; align-items: center; gap: 14px;
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      z-index: 1000;
+      background: var(--panel); border: 1px solid var(--accent);
+      border-radius: 999px; padding: 10px 20px;
+      box-shadow: 0 10px 34px rgba(0,0,0,.5);
+      font-size: 14px; color: var(--text); white-space: nowrap;
+    }
+    #friendRequestBar.show { display: flex; }
+    #friendRequestBar #friendRequestText { font-weight: 600; }
+    #friendRequestBar .fr-btn {
+      border: none; border-radius: 999px; padding: 7px 20px;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s;
+    }
+    #friendRequestBar .fr-btn:hover { opacity: .85; }
+    #friendRequestBar #friendAcceptBtn { background: var(--accent); color: #fff; }
+    #friendRequestBar #friendRejectBtn { background: transparent; border: 1px solid var(--border); color: var(--danger); }
     @media (max-width: 700px) {
       .users-panel { display: none; }
       .msg { max-width: 88%; }
@@ -146,14 +214,87 @@
 </head>
 <body>
 
+  <!-- ========== 登录 / 注册页（微软账号风格，默认显示，登录成功后才进入加入页） ========== -->
+  <div id="loginPage">
+
+    <!-- 登录卡 -->
+    <div class="auth-card join-card active" id="loginCard">
+      <h1>登录</h1>
+      <div class="sub" id="loginSubTitle">使用用户名或邮箱登录加密聊天室</div>
+
+      <!-- 密码登录 -->
+      <div id="pwdLoginSection">
+        <div class="field">
+          <label for="loginAccount">用户名或邮箱</label>
+          <input id="loginAccount" type="text" autocomplete="username" placeholder="用户名或邮箱">
+        </div>
+        <div class="field">
+          <label for="loginPassword">密码</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="密码">
+        </div>
+        <button id="loginBtn" class="btn">登 录</button>
+        <div id="loginError" class="error"></div>
+        <div class="switch-link">
+          <a id="toDeviceKeyLink">使用设备密钥登录</a>
+          <span style="margin:0 8px">·</span>
+          <a id="toRegisterLink">注册一个</a>
+        </div>
+      </div>
+
+      <!-- 设备密钥登录 -->
+      <div id="dkLoginSection" style="display:none">
+        <div class="field">
+          <label for="loginDeviceKey">设备密钥</label>
+          <input id="loginDeviceKey" type="password" autocomplete="off" placeholder="粘贴设备密钥">
+        </div>
+        <button id="dkLoginBtn" class="btn">设备密钥登录</button>
+        <div id="dkLoginError" class="error"></div>
+        <div class="switch-link">
+          <a id="toPasswordLink">使用密码登录</a>
+          <span style="margin:0 8px">·</span>
+          <a id="toRegisterLink2">注册一个</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 注册卡 -->
+    <div class="auth-card join-card" id="registerCard">
+      <h1>注册</h1>
+      <div class="sub">创建账号仅需用户名、邮箱与密码（无验证码，不发送邮件）</div>
+      <div class="field">
+        <label for="regUsername">用户名</label>
+        <input id="regUsername" type="text" autocomplete="username" maxlength="32" placeholder="设置用户名">
+      </div>
+      <div class="field">
+        <label for="regEmail">邮箱</label>
+        <input id="regEmail" type="email" autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="regPassword">密码</label>
+        <input id="regPassword" type="password" autocomplete="new-password" placeholder="至少 4 位">
+      </div>
+      <div class="field">
+        <label for="regPassword2">确认密码</label>
+        <input id="regPassword2" type="password" autocomplete="new-password" placeholder="再次输入密码">
+      </div>
+      <button id="registerBtn" class="btn">注 册</button>
+      <div id="registerError" class="error"></div>
+      <div class="switch-link">已有账号？<a id="toLoginLink">登录</a></div>
+    </div>
+
+  </div>
+
   <!-- ========== 加入页 ========== -->
   <div id="joinPage">
     <div class="join-card">
-      <h1>🔒 加密聊天室</h1>
+      <div class="join-top">
+        <h1>🔒 加密聊天室</h1>
+        <button id="openSettingsBtn" class="btn-sm">账号设置</button>
+      </div>
       <div class="sub">AES-256 端到端加密 · 无数据库 · 轻量部署</div>
       <div class="field">
         <label for="serverAddr">服务器地址</label>
-        <input id="serverAddr" type="text" autocomplete="off" placeholder="http://127.0.0.1:3000">
+        <input id="serverAddr" type="text" autocomplete="off" placeholder="http://127.0.0.1:3001">
       </div>
       <div class="field">
         <label for="roomId">房间号（不存在且密码正确时自动创建）</label>
@@ -170,8 +311,34 @@
       <button id="joinBtn" class="btn">加入聊天室</button>
       <div id="joinError" class="error"></div>
       <div class="hint">
-        说明：群聊消息使用<b>房间密码派生密钥</b>（PBKDF2 → AES-256-GCM）加密；私聊使用 <b>ECDH P-256</b> 密钥协商。服务端只转发密文，无法查看内容。支持私聊的浏览器：Chrome / Edge / Firefox / Safari（≥ Safari 15）。
+        说明：群聊消息使用<b>房间密码派生密钥</b>（PBKDF2 → AES-256-GCM）加密；私聊使用 <b>ECDH P-256</b> 密钥协商，且<b>需先加好友</b>才能发起。加密在浏览器本地完成（纯 JS 库，无需 HTTPS），服务端只转发密文，无法查看内容。
       </div>
+    </div>
+  </div>
+
+  <!-- ========== 账号设置页（登录后可进入，默认隐藏） ========== -->
+  <div id="settingsPage">
+    <div class="join-card">
+      <div class="settings-top">
+        <h1>账号设置</h1>
+        <button id="settingsBackBtn" class="btn-sm">返回</button>
+      </div>
+      <div class="sub">管理账号信息与设备密钥</div>
+
+      <div class="section-title">账号信息</div>
+      <div class="info-row"><span class="k">用户名</span><span class="v" id="setUsername">-</span></div>
+      <div class="info-row"><span class="k">邮箱</span><span class="v" id="setEmail">-</span></div>
+
+      <div class="section-title">设备密钥（免密码登录）</div>
+      <button id="genDeviceKeyBtn" class="btn-outline">＋ 新增设备密钥</button>
+      <div id="newDkBox" class="new-dk-box">
+        <div class="warn">请妥善保存，密钥只显示一次，关闭后将无法再次查看</div>
+        <div class="key-text" id="newDkKey"></div>
+        <button id="newDkCloseBtn" class="btn" style="margin-top:4px">我已保存，关闭</button>
+      </div>
+      <div id="dkList" style="margin-top:12px"></div>
+
+      <div id="settingsError" class="error"></div>
     </div>
   </div>
 
@@ -189,6 +356,12 @@
       <span>私聊中：<b id="privateTarget"></b></span>
       <span class="close" id="privateClose" title="结束私聊">✕</span>
     </div>
+    <!-- 好友请求内联确认条（fixed 底部居中，默认隐藏） -->
+    <div id="friendRequestBar">
+      <span id="friendRequestText"></span>
+      <button id="friendAcceptBtn" class="fr-btn">接受</button>
+      <button id="friendRejectBtn" class="fr-btn">拒绝</button>
+    </div>
     <div class="chat-body">
       <div class="chat-main">
         <div class="messages" id="messages"></div>
@@ -204,7 +377,8 @@
     </div>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/socket.io.js"></script>
+  <script src="/vendor/noble.js"></script>
   <script src="/crypto.js"></script>
   <script src="/app.js"></script>
 </body>

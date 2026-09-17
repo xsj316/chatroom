@@ -11,9 +11,9 @@
 'use strict';
 
 (() => {
-  // 仅支持安全上下文（https 或 localhost）
-  if (!window.isSecureContext) {
-    document.body.innerHTML = '<div style="padding:40px;text-align:center">Web Crypto API 需要 HTTPS 或 localhost 环境。局域网/公网访问请配置 HTTPS 反向代理（见 README）。</div>';
+  // 纯 JS 加密库（@noble 系列）无需 HTTPS / localhost，公网 HTTP 亦可用
+  if (!window.NobleCrypto) {
+    document.body.innerHTML = '<div style="padding:40px;text-align:center">加密库未加载：请确认页面正确引入了 /vendor/noble.js 与 /crypto.js。</div>';
     return;
   }
 
@@ -29,11 +29,48 @@
     users: new Map(),       // id -> { nick, publicKeyB64 }
     ecdhKeys: new Map(),    // id -> { keyPair, publicKeyB64 }
     privateKeys: new Map(), // id -> AES key（与对方协商好的）
-    privateTarget: null     // 当前私聊对象 id
+    privateTarget: null,    // 当前私聊对象 id
+    friendNicks: new Set(), // 当前用户的好友昵称集合
+    pendingFriend: null     // 待处理的好友请求 { from, fromId }
   };
 
   /* ---------------- 页面元素 ---------------- */
+  const loginPage = $('loginPage');
+  const loginCard = $('loginCard');
+  const registerCard = $('registerCard');
+  const toRegisterLink = $('toRegisterLink');
+  const toLoginLink = $('toLoginLink');
+  const loginAccount = $('loginAccount');
+  const loginPassword = $('loginPassword');
+  const loginBtn = $('loginBtn');
+  const loginError = $('loginError');
+  const pwdLoginSection = $('pwdLoginSection');
+  const dkLoginSection = $('dkLoginSection');
+  const loginDeviceKey = $('loginDeviceKey');
+  const dkLoginBtn = $('dkLoginBtn');
+  const dkLoginError = $('dkLoginError');
+  const loginSubTitle = $('loginSubTitle');
+  const toDeviceKeyLink = $('toDeviceKeyLink');
+  const toPasswordLink = $('toPasswordLink');
+  const toRegisterLink2 = $('toRegisterLink2');
+  const regUsername = $('regUsername');
+  const regEmail = $('regEmail');
+  const regPassword = $('regPassword');
+  const regPassword2 = $('regPassword2');
+  const registerBtn = $('registerBtn');
+  const registerError = $('registerError');
   const joinPage = $('joinPage');
+  const openSettingsBtn = $('openSettingsBtn');
+  const settingsPage = $('settingsPage');
+  const settingsBackBtn = $('settingsBackBtn');
+  const setUsername = $('setUsername');
+  const setEmail = $('setEmail');
+  const genDeviceKeyBtn = $('genDeviceKeyBtn');
+  const newDkBox = $('newDkBox');
+  const newDkKey = $('newDkKey');
+  const newDkCloseBtn = $('newDkCloseBtn');
+  const dkList = $('dkList');
+  const settingsError = $('settingsError');
   const chatPage = $('chatPage');
   const joinBtn = $('joinBtn');
   const joinError = $('joinError');
@@ -44,6 +81,8 @@
   const privateBar = $('privateBar');
   const privateTargetEl = $('privateTarget');
   const onlineBadge = $('onlineBadge');
+  const friendRequestBar = $('friendRequestBar');
+  const friendRequestText = $('friendRequestText');
 
   /* ---------------- 小工具 ---------------- */
   function showError(text) {
@@ -62,6 +101,270 @@
     return String(s).replace(/[&<>"']/g, c => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
+  }
+
+  /* ---------------- 登录 / 注册（账号体系，仿微软风格） ---------------- */
+  function showLoginError(text) {
+    loginError.textContent = text;
+    loginError.classList.add('show');
+  }
+  function hideLoginError() {
+    loginError.classList.remove('show');
+  }
+  function showRegisterError(text) {
+    registerError.textContent = text;
+    registerError.classList.add('show');
+  }
+  function hideRegisterError() {
+    registerError.classList.remove('show');
+  }
+  /** 后端登录 API 基础地址：端口拆分架构，固定为当前站点 host + 3001 */
+  function resolveBackendBase() {
+    return location.protocol + '//' + location.hostname + ':3001';
+  }
+  function isValidEmail(s) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || '').trim());
+  }
+  /** 登录/注册成功：保存 token 与用户名，隐藏认证页并显示加入页（昵称默认填充用户名） */
+  function showJoinPage() {
+    hideLoginError();
+    hideRegisterError();
+    loginPage.style.display = 'none';
+    joinPage.style.display = 'flex';
+    $('serverAddr').value = resolveBackendBase();
+    $('nick').value = sessionStorage.getItem('chatroom_username') || '';
+  }
+  async function doLogin() {
+    const account = (loginAccount.value || '').trim();
+    const password = loginPassword.value || '';
+    if (!account) return showLoginError('请输入用户名或邮箱');
+    if (!password) return showLoginError('请输入密码');
+    const backend = resolveBackendBase();
+    loginBtn.disabled = true;
+    hideLoginError();
+    try {
+      const resp = await fetch(backend + '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account, password })
+      });
+      const data = await resp.json();
+      if (data && data.ok === true && data.token) {
+        sessionStorage.setItem('chatroom_token', data.token);
+        sessionStorage.setItem('chatroom_username', data.username || account);
+        showJoinPage();
+      } else {
+        showLoginError((data && data.error) || '登录失败');
+      }
+    } catch (e) {
+      showLoginError('无法连接登录服务器：' + e.message);
+    } finally {
+      loginBtn.disabled = false;
+    }
+  }
+  /** 设备密钥直接登录（方式 B） */
+  function showDkLoginError(text) {
+    dkLoginError.textContent = text;
+    dkLoginError.classList.add('show');
+  }
+  function hideDkLoginError() {
+    dkLoginError.classList.remove('show');
+  }
+  function switchToDeviceKeyMode() {
+    pwdLoginSection.style.display = 'none';
+    dkLoginSection.style.display = 'block';
+    loginSubTitle.textContent = '使用设备密钥免密码登录';
+    hideLoginError();
+    hideDkLoginError();
+    loginDeviceKey.focus();
+  }
+  function switchToPasswordMode() {
+    dkLoginSection.style.display = 'none';
+    pwdLoginSection.style.display = 'block';
+    loginSubTitle.textContent = '使用用户名或邮箱登录加密聊天室';
+    hideLoginError();
+    hideDkLoginError();
+  }
+  async function doDeviceKeyLogin() {
+    const deviceKey = (loginDeviceKey.value || '').trim();
+    if (!deviceKey) return showDkLoginError('请输入设备密钥');
+    const backend = resolveBackendBase();
+    dkLoginBtn.disabled = true;
+    hideDkLoginError();
+    try {
+      const resp = await fetch(backend + '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceKey })
+      });
+      const data = await resp.json();
+      if (data && data.ok === true && data.token) {
+        sessionStorage.setItem('chatroom_token', data.token);
+        sessionStorage.setItem('chatroom_username', data.username || '');
+        switchToPasswordMode();
+        showJoinPage();
+      } else {
+        showDkLoginError((data && data.error) || '设备密钥登录失败');
+      }
+    } catch (e) {
+      showDkLoginError('无法连接登录服务器：' + e.message);
+    } finally {
+      dkLoginBtn.disabled = false;
+    }
+  }
+
+  /* ---------------- 账号设置页（设备密钥管理） ---------------- */
+  function showSettingsError(text) {
+    settingsError.textContent = text;
+    settingsError.classList.add('show');
+  }
+  function hideSettingsError() {
+    settingsError.classList.remove('show');
+  }
+  /** 带 token 的 API 请求封装：GET / POST / DELETE */
+  async function apiFetch(path, opts) {
+    const token = sessionStorage.getItem('chatroom_token') || '';
+    const init = Object.assign({}, opts || {});
+    init.headers = Object.assign({}, (init.headers || {}));
+    if (token) init.headers['Authorization'] = 'Bearer ' + token;
+    const resp = await fetch(resolveBackendBase() + path, init);
+    return resp.json();
+  }
+  function fmtDkTime(ts) {
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  async function loadSettings() {
+    hideSettingsError();
+    setUsername.textContent = sessionStorage.getItem('chatroom_username') || '-';
+    setEmail.textContent = '-';
+    try {
+      const authData = await apiFetch('/api/auth/status');
+      if (authData && authData.ok && authData.user) {
+        setUsername.textContent = authData.user.username || '-';
+        setEmail.textContent = authData.user.email || '-';
+      }
+    } catch (e) { /* 邮箱获取失败不影响主流程 */ }
+    renderDkList(await apiFetch('/api/device-keys'));
+  }
+  function renderDkList(data) {
+    dkList.innerHTML = '';
+    if (!data || !data.ok) {
+      const tip = document.createElement('div');
+      tip.className = 'empty-tip';
+      tip.textContent = (data && data.error) || '获取设备密钥列表失败';
+      dkList.appendChild(tip);
+      return;
+    }
+    if (!Array.isArray(data.keys) || data.keys.length === 0) {
+      const tip = document.createElement('div');
+      tip.className = 'empty-tip';
+      tip.textContent = '暂无设备密钥，点击上方按钮为本机生成一个';
+      dkList.appendChild(tip);
+      return;
+    }
+    for (const dk of data.keys) {
+      const item = document.createElement('div');
+      item.className = 'dk-item';
+      const meta = document.createElement('div');
+      meta.className = 'dk-meta';
+      meta.innerHTML = '设备密钥 <span class="dk-tail">…' + esc(dk.tail || '') + '</span><div class="dk-time">创建于 ' + fmtDkTime(dk.createdAt) + '</div>';
+      const del = document.createElement('button');
+      del.className = 'dk-del';
+      del.textContent = '删除';
+      del.addEventListener('click', async () => {
+        if (!window.confirm('确定删除这台设备的密钥吗？删除后该设备将无法用此密钥登录。')) return;
+        hideSettingsError();
+        del.disabled = true;
+        try {
+          const r = await apiFetch('/api/device-keys/' + encodeURIComponent(dk.id), { method: 'DELETE' });
+          if (r && r.ok) renderDkList(await apiFetch('/api/device-keys'));
+          else showSettingsError((r && r.error) || '删除失败');
+        } catch (e) {
+          showSettingsError('删除失败：' + e.message);
+        }
+      });
+      item.appendChild(meta);
+      item.appendChild(del);
+      dkList.appendChild(item);
+    }
+  }
+  async function genDeviceKey() {
+    hideSettingsError();
+    genDeviceKeyBtn.disabled = true;
+    try {
+      const data = await apiFetch('/api/device-keys', { method: 'POST' });
+      if (data && data.ok && data.key) {
+        newDkKey.textContent = data.key;
+        newDkBox.classList.add('show');
+        renderDkList(await apiFetch('/api/device-keys'));
+      } else {
+        showSettingsError((data && data.error) || '生成失败，请重新登录');
+      }
+    } catch (e) {
+      showSettingsError('生成失败：' + e.message);
+    } finally {
+      genDeviceKeyBtn.disabled = false;
+    }
+  }
+  function openSettings() {
+    hideSettingsError();
+    newDkBox.classList.remove('show');
+    newDkKey.textContent = '';
+    joinPage.style.display = 'none';
+    settingsPage.classList.add('active');
+    loadSettings();
+  }
+  function closeSettings() {
+    settingsPage.classList.remove('active');
+    joinPage.style.display = 'flex';
+  }
+  async function doRegister() {
+    const username = (regUsername.value || '').trim();
+    const email = (regEmail.value || '').trim();
+    const password = regPassword.value || '';
+    const confirm = regPassword2.value || '';
+    if (!username) return showRegisterError('请输入用户名');
+    if (!email) return showRegisterError('请输入邮箱');
+    if (!isValidEmail(email)) return showRegisterError('邮箱格式不正确');
+    if (password.length < 4) return showRegisterError('密码最短 4 位');
+    if (password !== confirm) return showRegisterError('两次输入的密码不一致');
+    const backend = resolveBackendBase();
+    registerBtn.disabled = true;
+    hideRegisterError();
+    try {
+      const resp = await fetch(backend + '/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      });
+      const data = await resp.json();
+      if (data && data.ok === true && data.token) {
+        sessionStorage.setItem('chatroom_token', data.token);
+        sessionStorage.setItem('chatroom_username', data.username || username);
+        showJoinPage();
+      } else {
+        showRegisterError((data && data.error) || '注册失败');
+      }
+    } catch (e) {
+      showRegisterError('无法连接注册服务器：' + e.message);
+    } finally {
+      registerBtn.disabled = false;
+    }
+  }
+  /** 登录/注册卡片互切（微软账号风格） */
+  function switchToLogin() {
+    loginCard.classList.add('active');
+    registerCard.classList.remove('active');
+    hideLoginError();
+    hideRegisterError();
+  }
+  function switchToRegister() {
+    registerCard.classList.add('active');
+    loginCard.classList.remove('active');
+    hideLoginError();
+    hideRegisterError();
   }
 
   /* ---------------- 消息渲染 ---------------- */
@@ -107,21 +410,75 @@
         tip.textContent = '（我）';
         item.appendChild(tip);
       } else {
+        const isFriend = state.friendNicks.has(u.nick);
         const tip = document.createElement('span');
         tip.className = 'priv-tip';
-        tip.textContent = '私聊';
+        if (isFriend) {
+          tip.textContent = '私聊';
+          item.title = '点击发起私聊';
+          item.addEventListener('click', () => startPrivate(id));
+        } else {
+          tip.textContent = '＋加好友';
+          item.title = '点击添加好友';
+          item.addEventListener('click', () => sendFriendRequest(id));
+        }
         item.appendChild(tip);
-        item.title = '点击发起私聊';
-        item.addEventListener('click', () => startPrivate(id));
       }
       usersListEl.appendChild(item);
     }
   }
 
+  /* ---------------- 好友 ---------------- */
+  function sendFriendRequest(targetId) {
+    const target = state.users.get(targetId);
+    if (!target || targetId === state.myId) return;
+    if (state.friendNicks.has(target.nick)) return; // 已是好友无需重复请求
+    state.socket.emit('friend:request', { to: targetId });
+    addSystem(`已向 ${target.nick} 发送好友请求，等待对方确认`);
+  }
+
+  // 页面内联确认条：替代 window.confirm（iframe/内嵌预览环境会拦截 confirm 并返回 false）
+  function showFriendRequestBar(from, fromId) {
+    if (!friendRequestBar || !friendRequestText) return;
+    state.pendingFriend = { from, fromId };
+    friendRequestText.textContent = `${from} 请求加你为好友`;
+    friendRequestBar.classList.add('show'); // 同一时间只显示一个请求，新请求直接覆盖旧内容
+  }
+  function hideFriendRequestBar() {
+    state.pendingFriend = null;
+    if (friendRequestBar) friendRequestBar.classList.remove('show');
+  }
+  // 确认条按钮：接受/拒绝（按钮在 index.html 中，事件在此统一绑定）
+  document.addEventListener('DOMContentLoaded', () => {
+    const acceptBtn = $('friendAcceptBtn');
+    const rejectBtn = $('friendRejectBtn');
+    if (acceptBtn) {
+      acceptBtn.addEventListener('click', () => {
+        if (state.pendingFriend) {
+          state.socket.emit('friend:accept', { to: state.pendingFriend.fromId });
+        }
+        hideFriendRequestBar();
+      });
+    }
+    if (rejectBtn) {
+      rejectBtn.addEventListener('click', () => {
+        if (state.pendingFriend) {
+          state.socket.emit('friend:reject', { to: state.pendingFriend.fromId });
+        }
+        hideFriendRequestBar();
+      });
+    }
+  });
+
   /* ---------------- 私聊 ---------------- */
   async function startPrivate(targetId) {
     const target = state.users.get(targetId);
     if (!target || targetId === state.myId) return;
+    // 好友校验：只有互为好友才能私聊
+    if (!state.friendNicks.has(target.nick)) {
+      addSystem(`请先添加 ${target.nick} 为好友，才能发起私聊`);
+      return;
+    }
     // 若尚未与对方协商密钥，先发起 ECDH 握手
     if (!state.privateKeys.has(targetId)) {
       if (!state.ecdhKeys.has(state.myId)) {
@@ -179,7 +536,8 @@
       auth: {
         roomId: state.roomId,
         nick: state.nick,
-        password: state.password
+        password: state.password,
+        token: sessionStorage.getItem('chatroom_token') || ''
       },
       transports: ['websocket', 'polling']
     });
@@ -187,7 +545,7 @@
 
     socket.on('connect_error', (err) => {
       joinBtn.disabled = false;
-      showError('无法加入：' + (err.message || '连接失败') + '（请检查服务器地址与密码）');
+      showError('无法加入：' + (err.message || '连接失败') + '（请检查服务器地址、登录状态与房间密码）');
     });
 
     socket.on('joined', async (data) => {
@@ -280,6 +638,37 @@
       }
     });
 
+    // 好友列表（加入房间时服务端下发）
+    socket.on('friends:list', (nicks) => {
+      state.friendNicks = new Set(Array.isArray(nicks) ? nicks : []);
+      renderUsers();
+    });
+
+    // 收到好友请求：显示页面内联确认条（不用 window.confirm，避免 iframe 环境静默拒绝）
+    socket.on('friend:request', (data) => {
+      if (!data || !data.from || !data.fromId) return;
+      showFriendRequestBar(data.from, data.fromId);
+    });
+
+    // 好友添加成功（双方都会收到，携带对方昵称）
+    socket.on('friend:added', (data) => {
+      if (data && data.nick) {
+        state.friendNicks.add(data.nick);
+        renderUsers();
+        addSystem(`已与 ${data.nick} 成为好友，现在可以私聊了`);
+      }
+    });
+
+    // 好友请求被拒绝
+    socket.on('friend:rejected', (data) => {
+      addSystem(data && data.nick ? `${data.nick} 拒绝了你的好友请求` : '对方拒绝了你的好友请求');
+    });
+
+    // 私聊被拒（非好友）
+    socket.on('chat:private_denied', (data) => {
+      addSystem(data && data.reason ? data.reason : '无法私聊：请先添加对方为好友');
+    });
+
     socket.on('system', (data) => {
       addSystem(data.text);
     });
@@ -323,6 +712,43 @@
   // 结束私聊
   $('privateClose').addEventListener('click', stopPrivate);
 
-  // 默认服务器地址 = 当前站点地址
-  $('serverAddr').value = location.origin || ('http://' + location.host);
+  // 登录 / 注册 / 设备密钥：点击按钮 / 回车提交
+  loginBtn.addEventListener('click', doLogin);
+  loginPassword.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+  dkLoginBtn.addEventListener('click', doDeviceKeyLogin);
+  loginDeviceKey.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doDeviceKeyLogin();
+  });
+  registerBtn.addEventListener('click', doRegister);
+  regPassword2.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doRegister();
+  });
+  // 卡片切换
+  toRegisterLink.addEventListener('click', switchToRegister);
+  toRegisterLink2.addEventListener('click', switchToRegister);
+  toLoginLink.addEventListener('click', switchToLogin);
+  toDeviceKeyLink.addEventListener('click', switchToDeviceKeyMode);
+  toPasswordLink.addEventListener('click', switchToPasswordMode);
+
+  // 账号设置
+  openSettingsBtn.addEventListener('click', openSettings);
+  settingsBackBtn.addEventListener('click', closeSettings);
+  genDeviceKeyBtn.addEventListener('click', genDeviceKey);
+  newDkCloseBtn.addEventListener('click', () => {
+    newDkBox.classList.remove('show');
+    newDkKey.textContent = '';
+  });
+
+  // 默认服务器地址 = 当前站点 host + 后端端口 3001（端口拆分：页面 3000 / 聊天后端 3001）
+  const defaultBackend = location.protocol + '//' + location.hostname + ':3001';
+  $('serverAddr').value = defaultBackend;
+
+  // 已登录（sessionStorage 有 token）→ 直接显示加入页；否则停留在登录页
+  if (sessionStorage.getItem('chatroom_token')) {
+    loginPage.style.display = 'none';
+    joinPage.style.display = 'flex';
+    $('nick').value = sessionStorage.getItem('chatroom_username') || '';
+  }
 })();
